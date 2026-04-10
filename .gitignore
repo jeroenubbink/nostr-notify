@@ -1,0 +1,13 @@
+# Compiled binary
+nostr-notify
+dist/
+
+# Service key files — never commit private keys
+*.nsec
+service.nsec
+
+# Local spec / personal notes — not for public repo
+SPEC.md
+
+# Go test cache
+*.test
