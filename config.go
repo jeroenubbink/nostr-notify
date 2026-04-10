@@ -9,8 +9,6 @@ import (
 )
 
 // Config holds the parsed contents of a config.toml file.
-// Only the fields used in Phase 1 are present; see SPEC.md §7 for the full
-// schema that will be added in later phases.
 //
 // TODO (Phase 2): add [delivery] retry_attempts, retry_delay_seconds, spool_dir.
 //   For multi-user machines, spool_dir should be per-user
@@ -21,6 +19,7 @@ type Config struct {
 	Identity  IdentityConfig  `toml:"identity"`
 	Recipient RecipientConfig `toml:"recipient"`
 	Relays    RelaysConfig    `toml:"relays"`
+	Message   MessageConfig   `toml:"message"`
 }
 
 type IdentityConfig struct {
@@ -35,6 +34,13 @@ type RecipientConfig struct {
 
 type RelaysConfig struct {
 	URLs []string `toml:"urls"`
+}
+
+type MessageConfig struct {
+	// Format controls how the message body is presented.
+	// "plain" (default) sends content as-is.
+	// "code" wraps the body in a fenced Markdown code block.
+	Format string `toml:"format"`
 }
 
 // configPaths returns the candidate config file locations in preference order:

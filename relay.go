@@ -50,7 +50,11 @@ func PublishToRelays(ctx context.Context, event *nostr.Event, relayURLs []string
 }
 
 func publishOne(ctx context.Context, event *nostr.Event, url, serviceSK string) PublishResult {
-	relay, err := nostr.RelayConnect(ctx, url)
+	relay, err := nostr.RelayConnect(ctx, url,
+		nostr.WithNoticeHandler(func(notice string) {
+			slog.Debug("relay notice", "url", url, "notice", notice)
+		}),
+	)
 	if err != nil {
 		return PublishResult{URL: url, Err: fmt.Errorf("connect: %w", err)}
 	}

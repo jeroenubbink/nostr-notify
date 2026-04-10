@@ -28,6 +28,14 @@ urls = [
   "wss://relay2.example.com",
 ]
 
+[message]
+# Content format for the message body.
+# "plain" sends content as-is (default).
+# "code"  wraps the body in a fenced Markdown code block — preserves column
+#         alignment for tabular output (df, ps, log tails) in Nostr clients
+#         that render Markdown in DMs.
+# format = "code"
+
 # ── Coming in a future release ─────────────────────────────────────────────
 
 # [delivery]

@@ -30,10 +30,10 @@ const (
 // end-to-end encrypted and relays see only a blob addressed to a pubkey.
 var defaultRelayURLs = []string{
 	"wss://relay.damus.io",
-	"wss://nos.lol",
 	"wss://relay.nostr.band",
 	"wss://nostr.mom",
 	"wss://relay.primal.net",
+	"wss://relay.snort.social",
 }
 
 func main() {
@@ -66,6 +66,7 @@ func run() int {
 		keyFile      = flag.String("key-file", "", "Path to service nsec file; overrides config")
 		inputFile    = flag.String("file", "", "Read content from file instead of stdin")
 		relayList    = flag.String("relays", "", "Comma-separated relay URLs; overrides config")
+		format       = flag.String("format", "", `Content format: "plain" (default) or "code" (wrap in fenced code block)`)
 		contentLimit = flag.Int("content-limit", 64*1024, "Maximum content size in bytes; excess is truncated")
 		debug        = flag.Bool("debug", false, "Enable debug logging")
 	)
@@ -121,6 +122,19 @@ func run() int {
 		subj = fmt.Sprintf("%s %s", host, time.Now().Format("2006-01-02"))
 	}
 
+	// --- Format ---
+	resolvedFormat := *format
+	if resolvedFormat == "" {
+		resolvedFormat = cfg.Message.Format
+	}
+	if resolvedFormat == "" {
+		resolvedFormat = "plain"
+	}
+	if resolvedFormat != "plain" && resolvedFormat != "code" {
+		fmt.Fprintf(os.Stderr, "nostr-notify: unknown format %q; use \"plain\" or \"code\"\n", resolvedFormat)
+		return 1
+	}
+
 	// --- Content ---
 	content, err := readContent(*inputFile, *contentLimit)
 	if err != nil {
@@ -130,6 +144,9 @@ func run() int {
 	if content == "" {
 		fmt.Fprintf(os.Stderr, "nostr-notify: empty content, nothing to send\n")
 		return 1
+	}
+	if resolvedFormat == "code" {
+		content = "```\n" + content + "```"
 	}
 
 	// --- Build NIP-17 gift wrap ---

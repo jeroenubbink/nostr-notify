@@ -150,16 +150,17 @@ CLI flag  >  config file  >  built-in default
 | Recipient | `--to` | `recipient.pubkey` | none — required |
 | Relay list | `--relays` | `relays.urls` | 5 public relays |
 | Subject | `--subject` | — | `hostname YYYY-MM-DD` |
+| Format | `--format` | `message.format` | `plain` |
 
 ### Default relay list
 
 When no relay list is provided by config or flag, the tool falls back to a set of well-known public relays that accept NIP-59 gift-wrap events:
 
 - `wss://relay.damus.io`
-- `wss://nos.lol`
 - `wss://relay.nostr.band`
 - `wss://nostr.mom`
 - `wss://relay.primal.net`
+- `wss://relay.snort.social`
 
 Private or self-hosted relays belong in your config file.
 
@@ -181,6 +182,7 @@ nostr-notify keygen [--key-file PATH]
 | `--key-file PATH` | Path to service nsec file — overrides config |
 | `--file PATH` | Read message body from file instead of stdin |
 | `--relays URLS` | Comma-separated relay URLs — overrides config |
+| `--format plain\|code` | `plain` sends body as-is (default); `code` wraps in a fenced Markdown code block |
 | `--content-limit N` | Truncate message body at N bytes (default: 65536) |
 | `--debug` | Print debug logs to stderr |
 
