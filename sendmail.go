@@ -61,6 +61,22 @@ func runSendmail(args []string) int {
 		fmt.Fprintf(os.Stderr, "nostr-notify sendmail: %v\n", err)
 		return 1
 	}
+
+	// Default to "code" — sendmail content is almost always preformatted terminal
+	// output.  Respect an explicit config override if set.
+	resolvedFormat := cfg.Message.Format
+	if resolvedFormat == "" {
+		resolvedFormat = "code"
+	}
+
+	// Clients don't surface the NIP-17 subject tag; embed it visibly in the body.
+	switch resolvedFormat {
+	case "code":
+		content = "**" + subject + "**\n\n```\n" + content + "\n```"
+	default:
+		content = subject + "\n\n" + content
+	}
+
 	params, err := resolveParams(cfg, cliOverrides{})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "nostr-notify sendmail: %v\n", err)
