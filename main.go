@@ -38,19 +38,77 @@ var defaultRelayURLs = []string{
 
 func main() {
 	// Dispatch subcommands before the main flag set is parsed.
-	if len(os.Args) > 1 && os.Args[1] == "keygen" {
-		// Resolve default key file path: config file > hardcoded default.
-		keyDefault := defaultKeyFile
-		if cfg, err := loadConfig(); err == nil && cfg.Identity.KeyFile != "" {
-			keyDefault = cfg.Identity.KeyFile
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "sendmail":
+			os.Exit(runSendmail(os.Args[2:]))
+		case "keygen":
+			// Resolve default key file path: config file > hardcoded default.
+			keyDefault := defaultKeyFile
+			if cfg, err := loadConfig(); err == nil && cfg.Identity.KeyFile != "" {
+				keyDefault = cfg.Identity.KeyFile
+			}
+			fs := flag.NewFlagSet("keygen", flag.ExitOnError)
+			keyFile := fs.String("key-file", keyDefault, "Path to write the generated key file")
+			fs.Parse(os.Args[2:])
+			os.Exit(runKeygen(*keyFile))
 		}
-		fs := flag.NewFlagSet("keygen", flag.ExitOnError)
-		keyFile := fs.String("key-file", keyDefault, "Path to write the generated key file")
-		fs.Parse(os.Args[2:])
-		os.Exit(runKeygen(*keyFile))
 	}
 
 	os.Exit(run())
+}
+
+// sendParams holds the resolved service key, recipient, and relay list ready
+// for BuildGiftWrap and PublishToRelays.
+type sendParams struct {
+	serviceSK       string
+	recipientPubHex string
+	relays          []string
+}
+
+// cliOverrides carries the values of the three CLI flags that can override the
+// config file.  Zero values mean "not set by the caller; use config/default".
+type cliOverrides struct {
+	keyFile   string
+	to        string
+	relayList string
+}
+
+// resolveParams applies the flag > config > default priority chain for the
+// service key, recipient pubkey, and relay list.
+func resolveParams(cfg *Config, ov cliOverrides) (sendParams, error) {
+	resolvedKeyFile := ov.keyFile
+	if resolvedKeyFile == "" {
+		resolvedKeyFile = cfg.Identity.KeyFile
+	}
+	serviceSK, err := loadServiceKey(resolvedKeyFile)
+	if err != nil {
+		return sendParams{}, fmt.Errorf("key error: %w", err)
+	}
+
+	recipientNpub := ov.to
+	if recipientNpub == "" {
+		recipientNpub = cfg.Recipient.Pubkey
+	}
+	if recipientNpub == "" {
+		return sendParams{}, fmt.Errorf("recipient pubkey not set; add [recipient] pubkey to config or use --to")
+	}
+	recipientPubHex, err := resolveHexPubkey(recipientNpub)
+	if err != nil {
+		return sendParams{}, fmt.Errorf("bad recipient pubkey: %w", err)
+	}
+
+	var relays []string
+	switch {
+	case ov.relayList != "":
+		relays = splitTrimmed(ov.relayList, ",")
+	case len(cfg.Relays.URLs) > 0:
+		relays = cfg.Relays.URLs
+	default:
+		relays = defaultRelayURLs
+	}
+
+	return sendParams{serviceSK: serviceSK, recipientPubHex: recipientPubHex, relays: relays}, nil
 }
 
 func run() int {
@@ -78,41 +136,11 @@ func run() int {
 	}
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})))
 
-	// --- Service key: flag > config > default path / env var ---
-	resolvedKeyFile := *keyFile
-	if resolvedKeyFile == "" {
-		resolvedKeyFile = cfg.Identity.KeyFile
-	}
-	serviceSK, err := loadServiceKey(resolvedKeyFile)
+	// --- Service key / recipient / relays: flag > config > defaults ---
+	params, err := resolveParams(cfg, cliOverrides{keyFile: *keyFile, to: *to, relayList: *relayList})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "nostr-notify: key error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "nostr-notify: %v\n", err)
 		return 1
-	}
-
-	// --- Recipient pubkey: flag > config (required; no built-in default) ---
-	recipientNpub := *to
-	if recipientNpub == "" {
-		recipientNpub = cfg.Recipient.Pubkey
-	}
-	if recipientNpub == "" {
-		fmt.Fprintf(os.Stderr, "nostr-notify: recipient pubkey not set; add [recipient] pubkey to config or use --to\n")
-		return 1
-	}
-	recipientPubHex, err := resolveHexPubkey(recipientNpub)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "nostr-notify: bad recipient pubkey: %v\n", err)
-		return 1
-	}
-
-	// --- Relay list: flag > config > compiled-in defaults ---
-	var relays []string
-	switch {
-	case *relayList != "":
-		relays = splitTrimmed(*relayList, ",")
-	case len(cfg.Relays.URLs) > 0:
-		relays = cfg.Relays.URLs
-	default:
-		relays = defaultRelayURLs
 	}
 
 	// --- Subject ---
@@ -150,7 +178,7 @@ func run() int {
 	}
 
 	// --- Build NIP-17 gift wrap ---
-	giftWrap, err := BuildGiftWrap(content, subj, serviceSK, recipientPubHex)
+	giftWrap, err := BuildGiftWrap(content, subj, params.serviceSK, params.recipientPubHex)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "nostr-notify: build gift wrap: %v\n", err)
 		return 1
@@ -160,7 +188,7 @@ func run() int {
 	// --- Publish ---
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	_, anySuccess := PublishToRelays(ctx, giftWrap, relays, serviceSK)
+	_, anySuccess := PublishToRelays(ctx, giftWrap, params.relays, params.serviceSK)
 	if !anySuccess {
 		fmt.Fprintf(os.Stderr, "nostr-notify: all relays failed\n")
 		return 1

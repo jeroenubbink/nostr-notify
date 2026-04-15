@@ -171,6 +171,7 @@ Private or self-hosted relays belong in your config file.
 ```
 nostr-notify [flags]
 nostr-notify keygen [--key-file PATH]
+nostr-notify sendmail [sendmail-flags] [recipients...]
 ```
 
 ### Flags
@@ -209,6 +210,27 @@ nostr-notify keygen [--key-file PATH]
 ```
 
 Generates a new keypair, writes the nsec to PATH (default: value from config, or `./service.nsec`), mode 0600. Refuses to overwrite an existing file. Prints the npub to stdout.
+
+### Intercept system mail (sendmail mode)
+
+`nostr-notify sendmail` reads a raw RFC 2822 email from stdin and delivers it as a Nostr DM. It accepts and ignores the flags and recipient arguments that cron and system daemons pass to sendmail (`-oi`, `-t`, `root`, etc.), so it is a transparent hook into the existing mail flow.
+
+Add it to root's `.forward` file — the `\root` line keeps local delivery intact, and the pipe line sends a copy to Nostr:
+
+```
+\root
+"|/usr/local/bin/nostr-notify sendmail"
+```
+
+Works the same on Ubuntu (postfix) and OpenBSD (OpenSMTPD). No system-wide MTA config needed.
+
+Alternatively, via `/etc/aliases`:
+
+```
+root: root, "|/usr/local/bin/nostr-notify sendmail"
+```
+
+Then run `newaliases` (Ubuntu) or `doas newaliases` (OpenBSD) to rebuild the alias database.
 
 ---
 
@@ -308,6 +330,7 @@ nak decode nsec1...
 | `nip17.go` | NIP-17/59 event construction (`BuildGiftWrap`) |
 | `relay.go` | WebSocket connection, NIP-42 AUTH, parallel publish |
 | `keygen.go` | `nostr-notify keygen` subcommand |
+| `sendmail.go` | `nostr-notify sendmail` subcommand — RFC 2822 email parsing |
 | `config.example.toml` | Annotated example configuration |
 
 ### AUTH flow note
