@@ -336,3 +336,9 @@ nak decode nsec1...
 ### AUTH flow note
 
 go-nostr processes relay messages in a background goroutine. Haven sends the NIP-42 AUTH challenge on connect; after a brief pause we attempt a proactive AUTH. If the relay still replies `auth-required:` on the publish attempt, we authenticate with the fresh challenge and retry once. This handles both relays that challenge on connect and those that challenge on publish.
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
