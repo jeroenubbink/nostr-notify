@@ -184,7 +184,7 @@ nostr-notify sendmail [sendmail-flags] [recipients...]
 | `--file PATH` | Read message body from file instead of stdin |
 | `--relays URLS` | Comma-separated relay URLs — overrides config |
 | `--format plain\|code` | `plain` sends body as-is (default); `code` wraps in a fenced Markdown code block |
-| `--content-limit N` | Truncate message body at N bytes (default: 65536) |
+| `--content-limit N` | Truncate message body at N bytes before wrapping (default: 65536) |
 | `--debug` | Print debug logs to stderr |
 
 ### Send a message
@@ -210,6 +210,12 @@ nostr-notify keygen [--key-file PATH]
 ```
 
 Generates a new keypair, writes the nsec to PATH (default: value from config, or `./service.nsec`), mode 0600. Refuses to overwrite an existing file. Prints the npub to stdout.
+
+### Message size limit
+
+Nostr relays cap an event's `content` field at 65535 bytes. `nostr-notify` encrypts your message twice (rumor → seal → gift wrap, per NIP-17/NIP-59), and each NIP-44 layer adds base64 expansion plus padding. The *plaintext* ceiling is therefore much lower than 65535 bytes — typically around 25–35 KB depending on the content.
+
+If a message is too large to fit after encryption, the body is truncated on a UTF-8 boundary and a `[... truncated to fit relay limit]` marker is appended, then the wrap is rebuilt until it fits. Delivery is never attempted with an oversized event, so you will not see "content is too large" relay rejections.
 
 ### Intercept system mail (sendmail mode)
 
